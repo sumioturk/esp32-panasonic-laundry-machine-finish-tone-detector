@@ -1,40 +1,18 @@
-/*
- File/Sketch Name: AudioFrequencyDetector
-
- Version No.: v1.0 Created 12 December, 2019
- 
- Original Author: Clyde A. Lettsome, PhD, PE, MEM
- 
- Description:  This code/sketch makes displays the approximate frequency of the loudest sound detected by a sound detection module. For this project, the analog output from the 
- sound module detector sends the analog audio signal detected to A0 of the Arduino Uno. The analog signal is sampled and quantized (digitized). A Fast Fourier Transform (FFT) is
- then performed on the digitized data. The FFT converts the digital data from the approximate discrete-time domain result. The maximum frequency of the approximate discrete-time
- domain result is then determined and displayed via the Arduino IDE Serial Monitor.
-
- Note: The arduinoFFT.h library needs to be added to the Arduino IDE before compiling and uploading this script/sketch to an Arduino.
-
- License: This program is free software; you can redistribute it and/or modify it under the terms of the GNU General Public License (GPL) version 3, or any later
- version of your choice, as published by the Free Software Foundation.
-
- Notes: Copyright (c) 2019 by C. A. Lettsome Services, LLC
- For more information visit https://clydelettsome.com/blog/2019/12/18/my-weekend-project-audio-frequency-detector-using-an-arduino/
-
-*/
-
 #include "arduinoFFT.h"
 
-#define SAMPLES 128         //SAMPLES-pt FFT. Must be a base 2 number. Max 128 for Arduino Uno.
-#define ANALOG 36
-#define PH1_COUNT 6
-#define PH2_COUNT 5
-#define SAMPLING_FREQUENCY 6000//Ts = Based on Nyquist, must be 2 times the highest expected frequency.
+#define SAMPLES 128         
+#define ANALOG 36 //ESP32 DevKitC VP port. GPIO36
+#define PH1_COUNT 6 // 1900 - 200 Hz * 128 * samplingPeriod 
+#define PH2_COUNT 5 // 5 or more PH1s
+#define SAMPLING_FREQUENCY 6000 // Sampling rate 6kHz since 2kHz is a target
 arduinoFFT FFT = arduinoFFT();
 unsigned int samplingPeriod;
 unsigned long microSeconds;
 unsigned long phaseStart = 0;
 unsigned long detectionStart = 0;
 
-double vReal[SAMPLES]; //create vector of size SAMPLES to hold real values
-double vImag[SAMPLES]; //create vector of size SAMPLES to hold imaginary values
+double vReal[SAMPLES]; 
+double vImag[SAMPLES]; 
 unsigned char phase1 = 0;
 unsigned char phase2 = 0;
 
@@ -44,7 +22,7 @@ void resetPhaseIfNecessary()
   {
     if (micros() - phaseStart > 1000000 * 8)
     {
-      Serial.println("reset phases."); //Print out the most dominant frequency.
+      Serial.println("reset phases."); 
       phaseStart = 0;
       phase1 = 0;
       phase2 = 0;
@@ -75,7 +53,7 @@ void checkPhase1(double peak)
   {
     if (phase1 >= PH1_COUNT)
     {
-      Serial.println("phase1"); //Print out the most dominant frequency.
+      Serial.println("phase1"); 
       phase2++;
       if (phase2 > PH2_COUNT)
       {
@@ -93,38 +71,32 @@ void checkPhase1(double peak)
 
 void setup()
 {
-  Serial.begin(9600);                                           //Baud rate for the Serial Monitor
-  samplingPeriod = round(1000000 * (1.0 / SAMPLING_FREQUENCY)); //Period in microseconds
+  Serial.begin(9600);                                           
+  samplingPeriod = round(1000000 * (1.0 / SAMPLING_FREQUENCY)); 
   pinMode(2, OUTPUT);
   pinMode(ANALOG, INPUT);
 }
 
 void loop()
 {
-  /*Sample SAMPLES times*/
   for (int i = 0; i < SAMPLES; i++)
   {
-    microSeconds = micros(); //Returns the number of microseconds since the Arduino board began running the current script.
+    microSeconds = micros(); 
 
-    vReal[i] = analogRead(ANALOG); //Reads the value from analog pin 0 (A0), quantize it and save it as a real term.
-    vImag[i] = 0;             //Makes imaginary term 0 always
-    //Serial.print(vReal[i]);
-    //SSerial.print(",");
-    /*remaining wait time between samples if necessary*/
+    vReal[i] = analogRead(ANALOG); 
+    vImag[i] = 0;             
     while (micros() < (microSeconds + samplingPeriod))
     {
       //do nothing
     }
   }
 
-  /*Perform FFT on samples*/
   FFT.Windowing(vReal, SAMPLES, FFT_WIN_TYP_HAMMING, FFT_FORWARD);
   FFT.Compute(vReal, vImag, SAMPLES, FFT_FORWARD);
   FFT.ComplexToMagnitude(vReal, vImag, SAMPLES);
 
-  /*Find peak frequency and print peak*/
   double peak = FFT.MajorPeak(vReal, SAMPLES, SAMPLING_FREQUENCY);
-  Serial.println(peak); //Print out the most dominant frequency.
+  Serial.println(peak); 
   checkPhase1(peak);
   resetPhaseIfNecessary();
 }
